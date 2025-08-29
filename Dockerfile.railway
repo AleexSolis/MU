@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 44406
-EXPOSE 56457
+EXPOSE 44405
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
@@ -34,7 +34,7 @@ ENV OPENMU_GAMESERVER_ENABLED=true
 ENV OPENMU_CONNECTSERVER_ENABLED=true
 ENV OPENMU_ADMINPANEL_ENABLED=true
 ENV RESOLVE_IP=0.0.0.0
-ENV GAMESERVER_PORT=56457
+ENV GAMESERVER_PORT=44405
 ENV GAMESERVER_BIND_IP=0.0.0.0
 
 # Script de inicio simplificado
@@ -57,6 +57,6 @@ RUN chmod +x /start.sh
 
 EXPOSE 80
 EXPOSE 44406
-EXPOSE 56457
+EXPOSE 44405
 
 CMD ["/start.sh"]
