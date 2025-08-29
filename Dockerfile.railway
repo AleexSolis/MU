@@ -1,29 +1,82 @@
+# Dockerfile para Admin Panel + Connect Server (usando componentes nativos de OpenMU)
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
 WORKDIR /app
 EXPOSE 8080
-EXPOSE 44406
+EXPOSE 44405
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+# Build Admin Panel
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build-admin
 WORKDIR /src
-COPY ["src/Startup/MUnique.OpenMU.Startup.csproj", "src/Startup/"]
-RUN dotnet restore "src/Startup/MUnique.OpenMU.Startup.csproj"
+COPY ["Web/AdminPanel/MUnique.OpenMU.Web.AdminPanel.csproj", "Web/AdminPanel/"]
+RUN dotnet restore "Web/AdminPanel/MUnique.OpenMU.Web.AdminPanel.csproj"
 COPY . .
-WORKDIR "/src/src/Startup"
-RUN dotnet build "MUnique.OpenMU.Startup.csproj" -c Release -o /app/build -p:ci=true
+WORKDIR "/src/Web/AdminPanel"
+RUN dotnet build "MUnique.OpenMU.Web.AdminPanel.csproj" -c Release -o /app/build-admin -p:ci=true
+RUN dotnet publish "MUnique.OpenMU.Web.AdminPanel.csproj" -c Release -o /app/publish-admin -p:ci=true
 
-FROM build AS publish
-RUN dotnet publish "MUnique.OpenMU.Startup.csproj" -c Release -o /app/publish -p:ci=true
+# Build Connect Server
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build-connect
+WORKDIR /src
+COPY ["Dapr/ConnectServer.Host/MUnique.OpenMU.ConnectServer.Host.csproj", "Dapr/ConnectServer.Host/"]
+RUN dotnet restore "Dapr/ConnectServer.Host/MUnique.OpenMU.ConnectServer.Host.csproj"
+COPY . .
+WORKDIR "/src/Dapr/ConnectServer.Host"
+RUN dotnet build "MUnique.OpenMU.ConnectServer.Host.csproj" -c Release -o /app/build-connect -p:ci=true
+RUN dotnet publish "MUnique.OpenMU.ConnectServer.Host.csproj" -c Release -o /app/publish-connect -p:ci=true
 
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
+FROM nginx:alpine AS final
 
-RUN mkdir /app/logs
-RUN chmod 777 /app/logs
+# Instalar .NET runtime y herramientas
+RUN apk add --no-cache dotnet9-runtime aspnetcore9-runtime netcat-openbsd supervisor
 
-# Variables de entorno para Railway
+# Copiar Admin Panel
+WORKDIR /app/admin
+COPY --from=build-admin /app/publish-admin .
+
+# Copiar Connect Server
+WORKDIR /app/connect
+COPY --from=build-connect /app/publish-connect .
+
+# Copiar configuración nginx
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY deploy/all-in-one/.htpasswd /etc/nginx/.htpasswd
+
+# Crear directorios de logs
+RUN mkdir -p /app/logs && chmod 777 /app/logs
+
+# Configuración de supervisor
+RUN echo '[supervisord]' > /etc/supervisord.conf && \
+    echo 'nodaemon=true' >> /etc/supervisord.conf && \
+    echo 'user=root' >> /etc/supervisord.conf && \
+    echo '' >> /etc/supervisord.conf && \
+    echo '[program:admin]' >> /etc/supervisord.conf && \
+    echo 'command=dotnet MUnique.OpenMU.Web.AdminPanel.dll' >> /etc/supervisord.conf && \
+    echo 'directory=/app/admin' >> /etc/supervisord.conf && \
+    echo 'autostart=true' >> /etc/supervisord.conf && \
+    echo 'autorestart=true' >> /etc/supervisord.conf && \
+    echo 'stdout_logfile=/app/logs/admin.log' >> /etc/supervisord.conf && \
+    echo 'stderr_logfile=/app/logs/admin.error.log' >> /etc/supervisord.conf && \
+    echo '' >> /etc/supervisord.conf && \
+    echo '[program:connect]' >> /etc/supervisord.conf && \
+    echo 'command=dotnet MUnique.OpenMU.ConnectServer.Host.dll' >> /etc/supervisord.conf && \
+    echo 'directory=/app/connect' >> /etc/supervisord.conf && \
+    echo 'autostart=true' >> /etc/supervisord.conf && \
+    echo 'autorestart=true' >> /etc/supervisord.conf && \
+    echo 'stdout_logfile=/app/logs/connect.log' >> /etc/supervisord.conf && \
+    echo 'stderr_logfile=/app/logs/connect.error.log' >> /etc/supervisord.conf && \
+    echo '' >> /etc/supervisord.conf && \
+    echo '[program:nginx]' >> /etc/supervisord.conf && \
+    echo 'command=nginx -g "daemon off;"' >> /etc/supervisord.conf && \
+    echo 'autostart=true' >> /etc/supervisord.conf && \
+    echo 'autorestart=true' >> /etc/supervisord.conf && \
+    echo 'stdout_logfile=/app/logs/nginx.log' >> /etc/supervisord.conf && \
+    echo 'stderr_logfile=/app/logs/nginx.error.log' >> /etc/supervisord.conf
+
+# Variables de entorno
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-USER $APP_UID
-ENTRYPOINT ["dotnet", "MUnique.OpenMU.Startup.dll", "-autostart"]
+EXPOSE 80
+EXPOSE 44405
+
+CMD ["supervisord", "-c", "/etc/supervisord.conf"]
