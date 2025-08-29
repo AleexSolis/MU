@@ -23,35 +23,33 @@ RUN mkdir /app/logs && chmod 777 /app/logs
 COPY deploy/all-in-one/.htpasswd /etc/nginx/.htpasswd
 
 # Crear configuración de nginx personalizada para Railway
-RUN cat > /etc/nginx/nginx.conf << 'EOF'
-events {
-    worker_connections 1024;
-}
-
-http {
-    upstream openmu {
-        server 127.0.0.1:8080;
-    }
-
-    server {
-        listen 80;
-        auth_basic "Protected Site";
-        auth_basic_user_file /etc/nginx/.htpasswd;
-        
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        location / {
-            proxy_pass http://openmu;
-        }
-    }
-}
-EOF
+RUN echo 'events {' > /etc/nginx/nginx.conf && \
+    echo '    worker_connections 1024;' >> /etc/nginx/nginx.conf && \
+    echo '}' >> /etc/nginx/nginx.conf && \
+    echo '' >> /etc/nginx/nginx.conf && \
+    echo 'http {' >> /etc/nginx/nginx.conf && \
+    echo '    upstream openmu {' >> /etc/nginx/nginx.conf && \
+    echo '        server 127.0.0.1:8080;' >> /etc/nginx/nginx.conf && \
+    echo '    }' >> /etc/nginx/nginx.conf && \
+    echo '' >> /etc/nginx/nginx.conf && \
+    echo '    server {' >> /etc/nginx/nginx.conf && \
+    echo '        listen 80;' >> /etc/nginx/nginx.conf && \
+    echo '        auth_basic "Protected Site";' >> /etc/nginx/nginx.conf && \
+    echo '        auth_basic_user_file /etc/nginx/.htpasswd;' >> /etc/nginx/nginx.conf && \
+    echo '        ' >> /etc/nginx/nginx.conf && \
+    echo '        proxy_http_version 1.1;' >> /etc/nginx/nginx.conf && \
+    echo '        proxy_set_header Upgrade $$http_upgrade;' >> /etc/nginx/nginx.conf && \
+    echo '        proxy_set_header Connection "upgrade";' >> /etc/nginx/nginx.conf && \
+    echo '        proxy_set_header Host $$host;' >> /etc/nginx/nginx.conf && \
+    echo '        proxy_set_header X-Real-IP $$remote_addr;' >> /etc/nginx/nginx.conf && \
+    echo '        proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;' >> /etc/nginx/nginx.conf && \
+    echo '        proxy_set_header X-Forwarded-Proto $$scheme;' >> /etc/nginx/nginx.conf && \
+    echo '        ' >> /etc/nginx/nginx.conf && \
+    echo '        location / {' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_pass http://openmu;' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '    }' >> /etc/nginx/nginx.conf && \
+    echo '}' >> /etc/nginx/nginx.conf
 
 # Exponer puertos
 EXPOSE 80
@@ -64,33 +62,31 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Script de inicio
-RUN cat > /start.sh << 'EOF'
-#!/bin/sh
-set -e
-
-# Esperar un momento para asegurar que el sistema esté listo
-sleep 2
-
-# Iniciar OpenMU en background
-echo "Starting OpenMU..."
-cd /app
-dotnet MUnique.OpenMU.Startup.dll -autostart &
-OPENMU_PID=$!
-
-# Esperar a que OpenMU esté listo
-echo "Waiting for OpenMU to start..."
-sleep 10
-
-# Verificar que OpenMU esté corriendo
-if ! kill -0 $OPENMU_PID 2>/dev/null; then
-    echo "OpenMU failed to start"
-    exit 1
-fi
-
-# Iniciar nginx en foreground
-echo "Starting nginx..."
-nginx -g 'daemon off;'
-EOF
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'set -e' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Esperar un momento para asegurar que el sistema esté listo' >> /start.sh && \
+    echo 'sleep 2' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Iniciar OpenMU en background' >> /start.sh && \
+    echo 'echo "Starting OpenMU..."' >> /start.sh && \
+    echo 'cd /app' >> /start.sh && \
+    echo 'dotnet MUnique.OpenMU.Startup.dll -autostart &' >> /start.sh && \
+    echo 'OPENMU_PID=$$!' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Esperar a que OpenMU esté listo' >> /start.sh && \
+    echo 'echo "Waiting for OpenMU to start..."' >> /start.sh && \
+    echo 'sleep 10' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Verificar que OpenMU esté corriendo' >> /start.sh && \
+    echo 'if ! kill -0 $$OPENMU_PID 2>/dev/null; then' >> /start.sh && \
+    echo '    echo "OpenMU failed to start"' >> /start.sh && \
+    echo '    exit 1' >> /start.sh && \
+    echo 'fi' >> /start.sh && \
+    echo '' >> /start.sh && \
+    echo '# Iniciar nginx en foreground' >> /start.sh && \
+    echo 'echo "Starting nginx..."' >> /start.sh && \
+    echo 'nginx -g "daemon off;"' >> /start.sh
 
 RUN chmod +x /start.sh
 
