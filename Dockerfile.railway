@@ -1,16 +1,4 @@
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 55901
-EXPOSE 55902
-EXPOSE 55903
-EXPOSE 55904
-EXPOSE 55905
-EXPOSE 55906
-EXPOSE 44405
-EXPOSE 44406
-EXPOSE 55980
-
+# Stage 1: Build OpenMU
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
 COPY ["src/Startup/MUnique.OpenMU.Startup.csproj", "src/Startup/"]
@@ -18,20 +6,44 @@ RUN dotnet restore "src/Startup/MUnique.OpenMU.Startup.csproj"
 COPY . .
 WORKDIR "/src/src/Startup"
 RUN dotnet build "MUnique.OpenMU.Startup.csproj" -c Release -o /app/build -p:ci=true
-
-FROM build AS publish
 RUN dotnet publish "MUnique.OpenMU.Startup.csproj" -c Release -o /app/publish -p:ci=true
 
-FROM base AS final
+# Stage 2: Runtime with nginx
+FROM nginx:alpine AS final
+
+# Instalar .NET runtime
+RUN apk add --no-cache dotnet9-runtime
+
+# Copiar aplicación OpenMU
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
+RUN mkdir /app/logs && chmod 777 /app/logs
 
-RUN mkdir /app/logs
-RUN chmod 777 /app/logs
+# Copiar configuración de nginx y autenticación
+COPY deploy/all-in-one/nginx/nginx.dev.conf /etc/nginx/nginx.conf
+COPY deploy/all-in-one/.htpasswd /etc/nginx/.htpasswd
 
-# Variables de entorno para Railway
+# Exponer puertos
+EXPOSE 80
+EXPOSE 55901 55902 55903 55904 55905 55906
+EXPOSE 44405 44406
+EXPOSE 55980
+
+# Variables de entorno
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-USER $APP_UID
-ENTRYPOINT ["dotnet", "MUnique.OpenMU.Startup.dll", "-autostart"]
+# Script de inicio
+COPY <<EOF /start.sh
+#!/bin/sh
+# Iniciar OpenMU en background
+cd /app
+dotnet MUnique.OpenMU.Startup.dll -autostart &
+
+# Iniciar nginx en foreground
+nginx -g 'daemon off;'
+EOF
+
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
