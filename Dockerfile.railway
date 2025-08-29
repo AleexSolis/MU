@@ -1,4 +1,16 @@
-# Stage 1: Build OpenMU
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
+WORKDIR /app
+EXPOSE 8080
+EXPOSE 55901
+EXPOSE 55902
+EXPOSE 55903
+EXPOSE 55904
+EXPOSE 55905
+EXPOSE 55906
+EXPOSE 44405
+EXPOSE 44406
+EXPOSE 55980
+
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
 COPY ["src/Startup/MUnique.OpenMU.Startup.csproj", "src/Startup/"]
@@ -6,67 +18,20 @@ RUN dotnet restore "src/Startup/MUnique.OpenMU.Startup.csproj"
 COPY . .
 WORKDIR "/src/src/Startup"
 RUN dotnet build "MUnique.OpenMU.Startup.csproj" -c Release -o /app/build -p:ci=true
+
+FROM build AS publish
 RUN dotnet publish "MUnique.OpenMU.Startup.csproj" -c Release -o /app/publish -p:ci=true
 
-# Stage 2: Runtime with nginx
-FROM nginx:alpine AS final
-
-# Instalar .NET runtime, ASP.NET Core y netcat para verificación de puertos
-RUN apk add --no-cache dotnet9-runtime aspnetcore9-runtime netcat-openbsd
-
-# Copiar aplicación OpenMU
+FROM base AS final
 WORKDIR /app
-COPY --from=build /app/publish .
-RUN mkdir /app/logs && chmod 777 /app/logs
+COPY --from=publish /app/publish .
 
-# Copiar configuración de nginx y autenticación
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY deploy/all-in-one/.htpasswd /etc/nginx/.htpasswd
+RUN mkdir /app/logs
+RUN chmod 777 /app/logs
 
-# Exponer puertos
-EXPOSE 80
-EXPOSE 55901 55902 55903 55904 55905 55906
-EXPOSE 44405 44406
-EXPOSE 55980
-
-# Variables de entorno
+# Variables de entorno para Railway
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
-# Script de inicio
-RUN echo '#!/bin/sh' > /start.sh && \
-    echo 'set -e' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Esperar un momento para asegurar que el sistema esté listo' >> /start.sh && \
-    echo 'sleep 2' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Iniciar OpenMU en background' >> /start.sh && \
-    echo 'echo "Starting OpenMU..."' >> /start.sh && \
-    echo 'cd /app' >> /start.sh && \
-    echo 'dotnet MUnique.OpenMU.Startup.dll -autostart &' >> /start.sh && \
-    echo 'OPENMU_PID=$$!' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Esperar a que OpenMU esté listo y verificar puerto 8080' >> /start.sh && \
-    echo 'echo "Waiting for OpenMU to start..."' >> /start.sh && \
-    echo 'for i in $(seq 1 30); do' >> /start.sh && \
-    echo '    if nc -z localhost 8080 2>/dev/null; then' >> /start.sh && \
-    echo '        echo "OpenMU is ready on port 8080"' >> /start.sh && \
-    echo '        break' >> /start.sh && \
-    echo '    fi' >> /start.sh && \
-    echo '    echo "Waiting... ($$i/30)"' >> /start.sh && \
-    echo '    sleep 2' >> /start.sh && \
-    echo 'done' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Verificar que el puerto esté disponible' >> /start.sh && \
-    echo 'if ! nc -z localhost 8080 2>/dev/null; then' >> /start.sh && \
-    echo '    echo "OpenMU failed to start - port 8080 not available"' >> /start.sh && \
-    echo '    exit 1' >> /start.sh && \
-    echo 'fi' >> /start.sh && \
-    echo '' >> /start.sh && \
-    echo '# Iniciar nginx en foreground' >> /start.sh && \
-    echo 'echo "Starting nginx..."' >> /start.sh && \
-    echo 'nginx -g "daemon off;"' >> /start.sh
-
-RUN chmod +x /start.sh
-
-CMD ["/start.sh"]
+USER $APP_UID
+ENTRYPOINT ["dotnet", "MUnique.OpenMU.Startup.dll", "-autostart"]
