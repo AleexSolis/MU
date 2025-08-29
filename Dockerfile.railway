@@ -11,17 +11,47 @@ RUN dotnet publish "MUnique.OpenMU.Startup.csproj" -c Release -o /app/publish -p
 # Stage 2: Runtime with nginx
 FROM nginx:alpine AS final
 
-# Instalar .NET runtime
-RUN apk add --no-cache dotnet9-runtime
+# Instalar .NET runtime y ASP.NET Core
+RUN apk add --no-cache dotnet9-runtime aspnetcore9-runtime
 
 # Copiar aplicación OpenMU
 WORKDIR /app
 COPY --from=build /app/publish .
 RUN mkdir /app/logs && chmod 777 /app/logs
 
-# Copiar configuración de nginx y autenticación
-COPY deploy/all-in-one/nginx/nginx.dev.conf /etc/nginx/nginx.conf
+# Copiar autenticación
 COPY deploy/all-in-one/.htpasswd /etc/nginx/.htpasswd
+
+# Crear configuración de nginx personalizada para Railway
+RUN cat > /etc/nginx/nginx.conf << 'EOF'
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream openmu {
+        server 127.0.0.1:8080;
+    }
+
+    server {
+        listen 80;
+        auth_basic "Protected Site";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        location / {
+            proxy_pass http://openmu;
+        }
+    }
+}
+EOF
 
 # Exponer puertos
 EXPOSE 80
@@ -34,13 +64,31 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Script de inicio
-COPY <<EOF /start.sh
+RUN cat > /start.sh << 'EOF'
 #!/bin/sh
+set -e
+
+# Esperar un momento para asegurar que el sistema esté listo
+sleep 2
+
 # Iniciar OpenMU en background
+echo "Starting OpenMU..."
 cd /app
 dotnet MUnique.OpenMU.Startup.dll -autostart &
+OPENMU_PID=$!
+
+# Esperar a que OpenMU esté listo
+echo "Waiting for OpenMU to start..."
+sleep 10
+
+# Verificar que OpenMU esté corriendo
+if ! kill -0 $OPENMU_PID 2>/dev/null; then
+    echo "OpenMU failed to start"
+    exit 1
+fi
 
 # Iniciar nginx en foreground
+echo "Starting nginx..."
 nginx -g 'daemon off;'
 EOF
 
