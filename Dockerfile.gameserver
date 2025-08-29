@@ -1,4 +1,4 @@
-# Dockerfile para Game Server (usando monolito sin Dapr)
+# Dockerfile para Game Server (usando monolito con configuración específica)
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
 WORKDIR /app
 EXPOSE 8080
@@ -23,6 +23,11 @@ RUN mkdir /app/logs && chmod 777 /app/logs
 # Variables de entorno para Game Server
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV OPENMU_GAMESERVER_ENABLED=true
+ENV OPENMU_CONNECTSERVER_ENABLED=false
+ENV OPENMU_ADMINPANEL_ENABLED=false
+ENV USE_INMEMORY_DATABASE=true
+ENV SKIP_PLUGIN_LOADING=true
 
 USER $APP_UID
 ENTRYPOINT ["dotnet", "MUnique.OpenMU.Startup.dll"]
