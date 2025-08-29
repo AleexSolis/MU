@@ -7,10 +7,10 @@ EXPOSE 55902
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
-COPY ["Dapr/GameServer.Host/MUnique.OpenMU.GameServer.Host.csproj", "Dapr/GameServer.Host/"]
-RUN dotnet restore "Dapr/GameServer.Host/MUnique.OpenMU.GameServer.Host.csproj"
+COPY ["src/Dapr/GameServer.Host/MUnique.OpenMU.GameServer.Host.csproj", "src/Dapr/GameServer.Host/"]
+RUN dotnet restore "src/Dapr/GameServer.Host/MUnique.OpenMU.GameServer.Host.csproj"
 COPY . .
-WORKDIR "/src/Dapr/GameServer.Host"
+WORKDIR "/src/src/Dapr/GameServer.Host"
 RUN dotnet build "MUnique.OpenMU.GameServer.Host.csproj" -c Release -o /app/build -p:ci=true
 RUN dotnet publish "MUnique.OpenMU.GameServer.Host.csproj" -c Release -o /app/publish -p:ci=true
 
