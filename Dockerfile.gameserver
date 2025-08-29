@@ -1,16 +1,18 @@
-# Dockerfile para Game Server únicamente
+# Dockerfile para Game Server (usando Dapr Host nativo)
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
 WORKDIR /app
+EXPOSE 8080
 EXPOSE 55901
+EXPOSE 55902
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
-COPY ["src/Startup/MUnique.OpenMU.Startup.csproj", "src/Startup/"]
-RUN dotnet restore "src/Startup/MUnique.OpenMU.Startup.csproj"
+COPY ["Dapr/GameServer.Host/MUnique.OpenMU.GameServer.Host.csproj", "Dapr/GameServer.Host/"]
+RUN dotnet restore "Dapr/GameServer.Host/MUnique.OpenMU.GameServer.Host.csproj"
 COPY . .
-WORKDIR "/src/src/Startup"
-RUN dotnet build "MUnique.OpenMU.Startup.csproj" -c Release -o /app/build -p:ci=true
-RUN dotnet publish "MUnique.OpenMU.Startup.csproj" -c Release -o /app/publish -p:ci=true
+WORKDIR "/src/Dapr/GameServer.Host"
+RUN dotnet build "MUnique.OpenMU.GameServer.Host.csproj" -c Release -o /app/build -p:ci=true
+RUN dotnet publish "MUnique.OpenMU.GameServer.Host.csproj" -c Release -o /app/publish -p:ci=true
 
 FROM base AS final
 WORKDIR /app
@@ -21,9 +23,7 @@ RUN mkdir /app/logs && chmod 777 /app/logs
 # Variables de entorno para Game Server
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
-ENV OPENMU_GAMESERVER_ENABLED=true
-ENV OPENMU_CONNECTSERVER_ENABLED=false
-ENV OPENMU_ADMINPANEL_ENABLED=false
+ENV GS_ID=0
 
 USER $APP_UID
-ENTRYPOINT ["dotnet", "MUnique.OpenMU.Startup.dll", "-autostart"]
+ENTRYPOINT ["dotnet", "MUnique.OpenMU.GameServer.Host.dll"]
