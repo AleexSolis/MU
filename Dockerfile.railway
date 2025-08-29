@@ -1,15 +1,7 @@
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
 WORKDIR /app
 EXPOSE 8080
-EXPOSE 55901
-EXPOSE 55902
-EXPOSE 55903
-EXPOSE 55904
-EXPOSE 55905
-EXPOSE 55906
-EXPOSE 44405
 EXPOSE 44406
-EXPOSE 55980
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
