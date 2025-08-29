@@ -11,8 +11,8 @@ RUN dotnet publish "MUnique.OpenMU.Startup.csproj" -c Release -o /app/publish -p
 # Stage 2: Runtime with nginx
 FROM nginx:alpine AS final
 
-# Instalar .NET runtime y ASP.NET Core
-RUN apk add --no-cache dotnet9-runtime aspnetcore9-runtime
+# Instalar .NET runtime, ASP.NET Core y netcat para verificación de puertos
+RUN apk add --no-cache dotnet9-runtime aspnetcore9-runtime netcat-openbsd
 
 # Copiar aplicación OpenMU
 WORKDIR /app
@@ -74,13 +74,20 @@ RUN echo '#!/bin/sh' > /start.sh && \
     echo 'dotnet MUnique.OpenMU.Startup.dll -autostart &' >> /start.sh && \
     echo 'OPENMU_PID=$$!' >> /start.sh && \
     echo '' >> /start.sh && \
-    echo '# Esperar a que OpenMU esté listo' >> /start.sh && \
+    echo '# Esperar a que OpenMU esté listo y verificar puerto 8080' >> /start.sh && \
     echo 'echo "Waiting for OpenMU to start..."' >> /start.sh && \
-    echo 'sleep 10' >> /start.sh && \
+    echo 'for i in $(seq 1 30); do' >> /start.sh && \
+    echo '    if nc -z localhost 8080 2>/dev/null; then' >> /start.sh && \
+    echo '        echo "OpenMU is ready on port 8080"' >> /start.sh && \
+    echo '        break' >> /start.sh && \
+    echo '    fi' >> /start.sh && \
+    echo '    echo "Waiting... ($$i/30)"' >> /start.sh && \
+    echo '    sleep 2' >> /start.sh && \
+    echo 'done' >> /start.sh && \
     echo '' >> /start.sh && \
-    echo '# Verificar que OpenMU esté corriendo' >> /start.sh && \
-    echo 'if ! kill -0 $$OPENMU_PID 2>/dev/null; then' >> /start.sh && \
-    echo '    echo "OpenMU failed to start"' >> /start.sh && \
+    echo '# Verificar que el puerto esté disponible' >> /start.sh && \
+    echo 'if ! nc -z localhost 8080 2>/dev/null; then' >> /start.sh && \
+    echo '    echo "OpenMU failed to start - port 8080 not available"' >> /start.sh && \
     echo '    exit 1' >> /start.sh && \
     echo 'fi' >> /start.sh && \
     echo '' >> /start.sh && \
