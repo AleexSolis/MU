@@ -26,15 +26,19 @@ RUN mkdir /app/logs && chmod 777 /app/logs
 # Copiar configuración nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Variables de entorno - Solo Admin Panel
+# Variables de entorno para monolito completo
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV OPENMU_GAMESERVER_ENABLED=true
+ENV OPENMU_CONNECTSERVER_ENABLED=true
+ENV OPENMU_ADMINPANEL_ENABLED=true
 ENV RESOLVE_IP=yamanote.proxy.rlwy.net
+ENV GAMESERVER_PORT=44405
 
 # Script de inicio simplificado
 RUN echo '#!/bin/sh' > /start.sh && \
     echo 'set -e' >> /start.sh && \
-    echo 'echo "Starting OpenMU Admin Panel only..."' >> /start.sh && \
+    echo 'echo "Starting OpenMU Monolito Completo..."' >> /start.sh && \
     echo 'cd /app' >> /start.sh && \
     echo 'dotnet MUnique.OpenMU.Startup.dll &' >> /start.sh && \
     echo 'for i in $(seq 1 30); do' >> /start.sh && \
