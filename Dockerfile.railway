@@ -7,20 +7,20 @@ EXPOSE 44405
 # Build Admin Panel
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build-admin
 WORKDIR /src
-COPY ["Web/AdminPanel/MUnique.OpenMU.Web.AdminPanel.csproj", "Web/AdminPanel/"]
-RUN dotnet restore "Web/AdminPanel/MUnique.OpenMU.Web.AdminPanel.csproj"
+COPY ["src/Web/AdminPanel/MUnique.OpenMU.Web.AdminPanel.csproj", "src/Web/AdminPanel/"]
+RUN dotnet restore "src/Web/AdminPanel/MUnique.OpenMU.Web.AdminPanel.csproj"
 COPY . .
-WORKDIR "/src/Web/AdminPanel"
+WORKDIR "/src/src/Web/AdminPanel"
 RUN dotnet build "MUnique.OpenMU.Web.AdminPanel.csproj" -c Release -o /app/build-admin -p:ci=true
 RUN dotnet publish "MUnique.OpenMU.Web.AdminPanel.csproj" -c Release -o /app/publish-admin -p:ci=true
 
 # Build Connect Server
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build-connect
 WORKDIR /src
-COPY ["Dapr/ConnectServer.Host/MUnique.OpenMU.ConnectServer.Host.csproj", "Dapr/ConnectServer.Host/"]
-RUN dotnet restore "Dapr/ConnectServer.Host/MUnique.OpenMU.ConnectServer.Host.csproj"
+COPY ["src/Dapr/ConnectServer.Host/MUnique.OpenMU.ConnectServer.Host.csproj", "src/Dapr/ConnectServer.Host/"]
+RUN dotnet restore "src/Dapr/ConnectServer.Host/MUnique.OpenMU.ConnectServer.Host.csproj"
 COPY . .
-WORKDIR "/src/Dapr/ConnectServer.Host"
+WORKDIR "/src/src/Dapr/ConnectServer.Host"
 RUN dotnet build "MUnique.OpenMU.ConnectServer.Host.csproj" -c Release -o /app/build-connect -p:ci=true
 RUN dotnet publish "MUnique.OpenMU.ConnectServer.Host.csproj" -c Release -o /app/publish-connect -p:ci=true
 
